@@ -38,8 +38,10 @@ class FakeData:
         return random.randint(1, 10000)
 
     @staticmethod
-    def user():
-        return User(unique_id=FakeData.id(),
+    def user(id=None):
+        if id == None:
+            id = FakeData.id()
+        return User(unique_id=str(id),
                     nom = FakeData.nom_user(),
                     email = FakeData.email(),
                     url_photo = FakeData.url_photo())
@@ -77,15 +79,29 @@ class FakeData:
 
     @staticmethod
     def add_article_to_database(nbr=1):
-        for article in FakeData.articles(nbr):
+        articles = FakeData.articles(nbr)
+        for article in articles:
             article.save()
+        return articles
+
+    @staticmethod
+    def gerate_and_insert_articles():
+        print('Articles ')
+        for article in FakeData.articles():
+            print('nom: ', article.nom, ' categorie: ', article.categorie)
+
+        FakeData.add_article_to_database(20)
+
+    @staticmethod
+    def gerate_and_insert_user_with_articles():
+        print('User ')
+        user = FakeData.user(id=1)
+        print('nom: ', user.nom, ' id: ', user.unique_id)
+        for article in FakeData.add_article_to_database(10):
+            user.produits.append(article)
+            print('nom: ', article.nom, ' categorie: ', article.categorie)
+        user.save()
+
 
 if __name__ == '__main__':
-    print('Users ')
-    for user in FakeData.users():
-        print('nom: ', user.nom, ' email: ', user.email)
-    print('Articles ')
-    for article in FakeData.articles():
-        print('nom: ', article.nom, ' categorie: ', article.categorie)
-
-    FakeData.add_article_to_database(20)
+    print(FakeData.gerate_and_insert_user_with_articles())

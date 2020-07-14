@@ -14,6 +14,7 @@ from flask_cors import CORS
 import json
 import os
 
+
 from flask_login import (
     LoginManager,
     current_user,
@@ -188,7 +189,7 @@ def get_user_produits(id):
     user = User.objects(unique_id=id).first()
     if user == None:
         abort(404)
-    return user.produits().to_json()
+    return user.articles_to_json()
 
 @app.route('/users/<id>/produits', methods=['POST'])
 def add_produit(id):
@@ -199,16 +200,50 @@ def add_produit(id):
         not request.json['description']):
         abort(400)
     user = User.objects(unique_id=id).first()
+    if user == None:
+        abort(404)
     produit = Produit(nom=request.json['nom'],
                       prix=request.json['prix'],
                       categorie=request.json['categorie'],
-                      description=request.json['description']).save()
-    user.produits.append(produit).save()
-    return jsonify({'produit': produit.to_json()}), 201
+                      description=request.json['description'],
+                      url_photo=request.json['url_photo']).save()
+    user.produits.append(produit)
+    user.save()
+    return user.articles_to_json()
 
 @app.route('/produits', methods=['GET'])
 def all_produits():
     return Produit.objects().to_json()
+
+@app.route('/produits/<id>', methods=['DELETE'])
+def delete_produit(id):
+    produit = Produit.objects(id=id).first()
+    if user == None:
+        abort(404)
+    produit.delete()
+    return jsonify({'resultat' : True})
+
+@app.route('/produits/<id>', methods=['PUT'])
+def update_produit(id):
+
+    if (not request.json or
+        not request.json['prix'] or
+        not request.json['nom'] or
+        not request.json['categorie'] or
+        not request.json['description']):
+        abort(400)
+
+    produit = Produit.objects(id=id).first()
+    if produit == None:
+        abort(404)
+
+    produit.nom = request.json['nom']
+    produit.prix = request.json['prix'],
+    produit.categorie = request.json['categorie'],
+    produit.description = request.json['description']
+    produit.save()
+
+    return jsonify({'produit': produit.to_json()}), 201
 
 if __name__ == '__main__':
     app.run()
