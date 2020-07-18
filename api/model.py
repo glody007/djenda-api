@@ -2,7 +2,8 @@ from mongoengine import *
 from flask_login import UserMixin
 from bson.json_util import dumps
 
-connect('djenda-database')
+#connect('djenda-database')
+connect('project1', host='mongodb://heroku_dmv1wxhc:pgung11fd5un3qunjfj8jmfuo2@ds139614.mlab.com:39614/heroku_dmv1wxhc')
 
 class UserType:
     ENREGISTRER  = "enregistrer"
