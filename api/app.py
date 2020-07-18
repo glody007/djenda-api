@@ -229,7 +229,7 @@ def add_produit_only():
                       prix=request.json['prix'],
                       categorie=request.json['categorie'],
                       description=request.json['description'],
-                      url_photo="https://res.cloudinary.com/alchemist118/image/upload/w_100,h_100/v1595080373/mario.jpg"]).save()
+                      url_photo="https://res.cloudinary.com/alchemist118/image/upload/w_100,h_100/v1595080373/mario.jpg").save()
     user.produits.append(produit)
     user.save()
     return user.articles_to_json()
