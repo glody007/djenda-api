@@ -211,6 +211,29 @@ def add_produit(id):
     user.save()
     return user.articles_to_json()
 
+@app.route('/produits', methods=['POST'])
+def add_produit_only():
+    if (not request.json or
+        not request.json['prix'] or
+        not request.json['nom'] or
+        not request.json['categorie'] or
+        not request.json['description']):
+        abort(400)
+    user = None
+    if not User.objects(unique_id=1).first():
+        user = User(unique_id = 1,
+                    nom ="alchimiste",
+                    email = "djendambutwile@gmail.com",
+                    photo = "https://res.cloudinary.com/alchemist118/image/upload/w_100,h_100/v1595080373/mario.jpg")
+    produit = Produit(nom=request.json['nom'],
+                      prix=request.json['prix'],
+                      categorie=request.json['categorie'],
+                      description=request.json['description'],
+                      url_photo=request.json['url_photo']).save()
+    user.produits.append(produit)
+    user.save()
+    return user.articles_to_json()
+
 @app.route('/produits', methods=['GET'])
 def all_produits():
     return Produit.objects().to_json()
