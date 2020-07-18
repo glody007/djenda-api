@@ -3,3 +3,7 @@ Flask==1.1.2
 oauthlib==3.0.1
 pyOpenSSL==19.0.0
 Flask-Login==0.4.1
+Flask-Cors==3.0.7
+Flask-Login==0.4.1
+mongoengine==0.10.7
+bson==0.5.10
