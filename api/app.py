@@ -3,6 +3,7 @@ from flask import (
     jsonify,
     abort,
     make_response,
+    session,
     request,
     redirect,
     render_template,
@@ -13,7 +14,9 @@ from flask_cors import CORS
 # Python standard libraries
 import json
 import os
-
+import base64
+import sys
+import datetime
 
 from flask_login import (
     LoginManager,
@@ -25,16 +28,16 @@ from flask_login import (
 from oauthlib.oauth2 import WebApplicationClient
 import requests
 
-from .model import User, Produit, UserType
+from google.oauth2 import id_token
+from google.auth.transport import requests
 
-# configuration
-DEBUG = True
+from .model import User, Produit, UserType
 
 # Configuration
 #GOOGLE_CLIENT_ID = os.environ.get("1046255643666-j2lnved5a6slg15ibac6srr4um3k85vp.apps.googleusercontent.com", None)
 #GOOGLE_CLIENT_SECRET = os.environ.get("vvzB8F3CG199NKZIWHZfSwmg", None)
-GOOGLE_CLIENT_ID = "1046255643666-j2lnved5a6slg15ibac6srr4um3k85vp.apps.googleusercontent.com"
-GOOGLE_CLIENT_SECRET = "vvzB8F3CG199NKZIWHZfSwmg"
+GOOGLE_CLIENT_ID = "1046255643666-91nn9ntu6td2enctrensf3ke80hjrsk5.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET = "nN3yT124zRJ2e_r23cSGwCCA"
 GOOGLE_DISCOVERY_URL = (
     "https://accounts.google.com/.well-known/openid-configuration"
 )
@@ -43,7 +46,12 @@ GOOGLE_DISCOVERY_URL = (
 app = Flask(__name__)
 app.config.from_object(__name__)
 
-app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(24)
+app.config.update(
+    DEBUG = True,
+    SECRET_KEY = os.environ.get("SECRET_KEY") or os.urandom(24),
+    # conigure login_user(remember=True) valid for 7days, default=1year
+    REMEMBER_COOKIE_DURATION = datetime.timedelta(days=365)
+)
 
 # User session management setup
 # https://flask-login.readthedocs.io/en/latest
@@ -96,7 +104,12 @@ def get_google_provider_cfg():
 # Flask-Login helper to retrieve a user from our db
 @login_manager.user_loader
 def load_user(user_id):
-    return User.objects(unique_id=user_id).first()
+    return User.objects(unique_id=str(user_id)).first()
+
+@app.before_request
+def before_request():
+    session.permanent = True
+    app.permanent_session_lifetime = datetime.timedelta(days=5)
 
 @app.route("/login")
 def login():
@@ -169,9 +182,59 @@ def callback():
     if not User.objects(unique_id=unique_id).first():
         user.save()
 
-    login_user(user)
-
     return redirect(url_for("index"))
+
+
+from imagekitio import ImageKit
+
+imagekit = ImageKit(
+    private_key='private_8F2220cD8fLXKYoEvMs3pKH5yWk=',
+    public_key='public_hZTJIDqZ+LIgQhi0er6ag1HWRrY=',
+    url_endpoint = 'https://ik.imagekit.io/djenda'
+)
+
+@app.route('/auth_endpoint', methods=['GET'])
+def auth_endpoint():
+    auth_params = imagekit.get_authentication_parameters()
+
+    return jsonify(auth_params)
+
+@app.route('/login_test', methods=['GET'])
+def login_test():
+    user =  User.objects(unique_id=str(1)).first()
+    login_user(user)
+    return str(user.nom)
+
+@app.route('/logout_test', methods=['GET'])
+def logout_test():
+    logout_user()
+    return ""
+
+@app.route('/log_test', methods=['GET'])
+def log_test():
+    return str(current_user.is_authenticated)
+
+@app.route('/verify_oauth2_token/<token>', methods=['GET'])
+def verify_oauth2_token(token):
+    try:
+        userinfo_response = id_token.verify_oauth2_token(token, requests.Request(), GOOGLE_CLIENT_ID)
+
+        unique_id = userinfo_response["sub"]
+        print({"verify":current_user.is_authenticated})
+        user = User.objects(unique_id=str(unique_id)).first()
+        # Doesn't exist? Add it to the database.
+        if not user:
+            user = User(unique_id = str(userinfo_response["sub"]),
+                        nom = userinfo_response["given_name"],
+                        email = userinfo_response["email"],
+                        url_photo = userinfo_response["picture"])
+            user.save()
+            print("------USER------")
+        login_user(user)
+        return jsonify({"verify":current_user.is_authenticated})
+    except ValueError:
+        return jsonify({"verify":current_user.is_authenticated})
+
 
 @app.route('/users', methods=['GET'])
 def all_users():
@@ -191,48 +254,42 @@ def get_user_produits(id):
         abort(404)
     return user.articles_to_json()
 
-@app.route('/users/<id>/produits', methods=['POST'])
-def add_produit(id):
+def is_product_or_404(request):
     if (not request.json or
         not request.json['prix'] or
         not request.json['nom'] or
         not request.json['categorie'] or
-        not request.json['description']):
+        not request.json['description'] or
+        not request.json['url_photo'] or
+        not request.json['url_thumbnail_photo'] or
+        not request.json['latitude'] or
+        not request.json['longitude']):
         abort(400)
+
+@app.route('/users/<id>/produits', methods=['POST'])
+def add_produit(id):
+    is_product_or_404(request)
     user = User.objects(unique_id=id).first()
     if user == None:
         abort(404)
-    produit = Produit(nom=request.json['nom'],
-                      prix=request.json['prix'],
-                      categorie=request.json['categorie'],
-                      description=request.json['description'],
-                      url_photo=request.json['url_photo']).save()
+    produit = Produit.product_from_dict(request).save()
     user.produits.append(produit)
     user.save()
     return user.articles_to_json()
 
 @app.route('/produits', methods=['POST'])
 def add_produit_only():
-    if (not request.json or
-        not request.json['prix'] or
-        not request.json['nom'] or
-        not request.json['categorie'] or
-        not request.json['description']):
-        abort(400)
+    is_product_or_404(request)
     user = None
     if not User.objects(unique_id=1).first():
         user = User(unique_id = 1,
                     nom ="alchimiste",
                     email = "djendambutwile@gmail.com",
                     url_photo = "https://res.cloudinary.com/alchemist118/image/upload/w_100,h_100/v1595080373/mario.jpg")
-    produit = Produit(nom=request.json['nom'],
-                      prix=request.json['prix'],
-                      categorie=request.json['categorie'],
-                      description=request.json['description'],
-                      url_photo="https://res.cloudinary.com/alchemist118/image/upload/w_100,h_100/v1595080373/mario.jpg").save()
+    produit = Produit.product_from_dict(request).save()
     user.produits.append(produit)
     user.save()
-    return user.articles_to_json()
+    return produit.to_json()
 
 @app.route('/produits', methods=['GET'])
 def all_produits():
@@ -248,13 +305,7 @@ def delete_produit(id):
 
 @app.route('/produits/<id>', methods=['PUT'])
 def update_produit(id):
-
-    if (not request.json or
-        not request.json['prix'] or
-        not request.json['nom'] or
-        not request.json['categorie'] or
-        not request.json['description']):
-        abort(400)
+    is_product_or_404()
 
     produit = Produit.objects(id=id).first()
     if produit == None:

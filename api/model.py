@@ -3,7 +3,8 @@ from flask_login import UserMixin
 from bson.json_util import dumps
 
 #connect('djenda-database')
-connect('project1', host='mongodb://heroku_dmv1wxhc:pgung11fd5un3qunjfj8jmfuo2@ds139614.mlab.com:39614/heroku_dmv1wxhc')
+db = connect('djenda-test-database')
+#connect('project1', host='mongodb://heroku_dmv1wxhc:pgung11fd5un3qunjfj8jmfuo2@ds139614.mlab.com:39614/heroku_dmv1wxhc')
 
 class UserType:
     ENREGISTRER  = "enregistrer"
@@ -16,6 +17,18 @@ class Produit(Document):
     prix = IntField(required=True)
     description = StringField(required=True, max_length=200)
     url_photo = StringField(required=True)
+    url_thumbnail_photo = StringField(required=True)
+    location = GeoPointField(required=True)
+
+    @staticmethod
+    def product_from_dict(dict):
+        return Produit(nom=dict.json['nom'],
+                       prix=dict.json['prix'],
+                       categorie=dict.json['categorie'],
+                       description=dict.json['description'],
+                       url_photo=dict.json['url_photo'],
+                       url_thumbnail_photo=dict.json['url_thumbnail_photo'],
+                       location=[float(dict.json['longitude']), float(dict.json['latitude'])])
 
 
 

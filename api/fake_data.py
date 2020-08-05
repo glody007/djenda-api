@@ -15,7 +15,11 @@ class FakeData:
 
     @staticmethod
     def url_photo():
-         return "https://res.cloudinary.com/alchemist118/image/upload/v1594291814/djenda/image-placeholder_sgrgq3.jpg"
+         return "https://ik.imagekit.io/djenda/Djenda_M8A0w1OWcA"
+
+    @staticmethod
+    def url_thumbnail_photo():
+         return "https://ik.imagekit.io/djenda/tr:n-media_library_thumbnail/Djenda_M8A0w1OWcA"
 
     @staticmethod
     def categorie():
@@ -47,12 +51,19 @@ class FakeData:
                     url_photo = FakeData.url_photo())
 
     @staticmethod
+    def location():
+        return [10.5, -10.4]
+
+
+    @staticmethod
     def article():
         return Produit(nom=FakeData.nom_article(),
                        prix=FakeData.prix(),
                        categorie=FakeData.categorie(),
                        description=FakeData.description(),
-                       url_photo=FakeData.url_photo())
+                       url_photo=FakeData.url_photo(),
+                       url_thumbnail_photo=FakeData.url_thumbnail_photo(),
+                       location=FakeData.location())
 
     @staticmethod
     def users():
@@ -101,7 +112,9 @@ class FakeData:
             user.produits.append(article)
             print('nom: ', article.nom, ' categorie: ', article.categorie)
         user.save()
+        print(User.objects(unique_id=str(1)))
 
 
 if __name__ == '__main__':
+    db.drop_database('djenda-test-database')
     print(FakeData.gerate_and_insert_user_with_articles())

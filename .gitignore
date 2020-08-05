@@ -1,3 +1,4 @@
 *.pyc
 venv
+djenda_env
 __pycache__
