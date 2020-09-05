@@ -27,3 +27,5 @@ rsa==4.6
 six==1.15.0
 urllib3==1.24.3
 Werkzeug==1.0.1
+twilio==6.38.0
+python-dotenv==0.12.0

@@ -33,14 +33,17 @@ from google.auth.transport import requests
 
 from .model import User, Produit, UserType
 
-# Configuration
-#GOOGLE_CLIENT_ID = os.environ.get("1046255643666-j2lnved5a6slg15ibac6srr4um3k85vp.apps.googleusercontent.com", None)
-#GOOGLE_CLIENT_SECRET = os.environ.get("vvzB8F3CG199NKZIWHZfSwmg", None)
-GOOGLE_CLIENT_ID = "1046255643666-91nn9ntu6td2enctrensf3ke80hjrsk5.apps.googleusercontent.com"
-GOOGLE_CLIENT_SECRET = "nN3yT124zRJ2e_r23cSGwCCA"
-GOOGLE_DISCOVERY_URL = (
-    "https://accounts.google.com/.well-known/openid-configuration"
-)
+# settings.py
+from dotenv import load_dotenv
+load_dotenv()
+
+# OR, the same with increased verbosity
+load_dotenv(verbose=True)
+
+# OR, explicitly providing path to '.env'
+from pathlib import Path  # Python 3.6+ only
+env_path = Path('..') / '.env'
+load_dotenv(dotenv_path=env_path)
 
 # instantiate the app
 app = Flask(__name__)
@@ -50,7 +53,13 @@ app.config.update(
     DEBUG = True,
     SECRET_KEY = os.environ.get("SECRET_KEY") or os.urandom(24),
     # conigure login_user(remember=True) valid for 7days, default=1year
-    REMEMBER_COOKIE_DURATION = datetime.timedelta(days=365)
+    REMEMBER_COOKIE_DURATION = datetime.timedelta(days=365),
+    GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID"),
+    GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET"),
+    GOOGLE_DISCOVERY_URL = os.getenv("GOOGLE_DISCOVERY_URL"),
+    IMAGEKIT_PRIVATE_KEY = os.getenv("IMAGEKIT_PRIVATE_KEY"),
+    IMAGEKIT_PUBLIC_KEY = os.getenv("IMAGEKIT_PUBLIC_KEY"),
+    IMAGEKIT_URL_ENDPOINT = os.getenv("IMAGEKIT_URL_ENDPOINT")
 )
 
 # User session management setup
@@ -59,12 +68,7 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 
 # OAuth 2 client setup
-client = WebApplicationClient(GOOGLE_CLIENT_ID)
-
-# Flask-Login helper to retrieve a user from our db
-@login_manager.user_loader
-def load_user(user_id):
-    return User.get(user_id)
+client = WebApplicationClient(app.config['GOOGLE_CLIENT_ID'])
 
 # enable CORS
 CORS(app, resources={r'/*': {'origins': '*'}})
@@ -80,18 +84,7 @@ def bad_request(error):
 
 @app.route("/")
 def index():
-    if current_user.is_authenticated:
-        return (
-            "<p>Hello, {}! You're logged in! Email: {}</p>"
-            "<div><p>Google Profile Picture:</p>"
-            '<img src="{}" alt="Google profile pic"></img></div>'
-            '<a class="button" href="/logout">Logout</a>'.format(
-                current_user.nom, current_user.email, current_user.photo
-            )
-        )
-    else:
-        reponse = '<a class="button" href="/login">Google Login</a>'
-        return jsonify({'nom' : 'alchimiste'})
+    return ("<p>Welcome to Jjenda</p>")
 
 @app.route("/user")
 def user():
@@ -99,7 +92,7 @@ def user():
 
 
 def get_google_provider_cfg():
-    return requests.get(GOOGLE_DISCOVERY_URL).json()
+    return requests.get(app.config['GOOGLE_DISCOVERY_URL']).json()
 
 # Flask-Login helper to retrieve a user from our db
 @login_manager.user_loader
@@ -109,7 +102,7 @@ def load_user(user_id):
 @app.before_request
 def before_request():
     session.permanent = True
-    app.permanent_session_lifetime = datetime.timedelta(days=5)
+    app.permanent_session_lifetime = app.config['REMEMBER_COOKIE_DURATION']
 
 @app.route("/login")
 def login():
@@ -153,7 +146,7 @@ def callback():
         token_url,
         headers=headers,
         data=body,
-        auth=(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET),
+        auth=(app.config['GOOGLE_CLIENT_ID'], app.config['GOOGLE_CLIENT_SECRET']),
     )
 
     # Parse the tokens!
@@ -174,7 +167,7 @@ def callback():
         user = User(unique_id = userinfo_response.json()["sub"],
                     nom = userinfo_response.json()["given_name"],
                     email = userinfo_response.json()["email"],
-                    photo = userinfo_response.json()["picture"])
+                    url_photo = userinfo_response.json()["picture"])
     else:
         return "User email not available or not verified by Google.", 400
 
@@ -185,12 +178,79 @@ def callback():
     return redirect(url_for("index"))
 
 
+from twilio.rest import Client
+
+#Initialize Twilio client
+client = Client()
+
+def start_verification(to, channel='sms'):
+    if channel not in ('sms', 'call'):
+        channel = 'sms'
+
+    service = app.config['VERIFICATION_SID']
+
+    verification = client.verify \
+        .services(service) \
+        .verifications \
+        .create(to=to, channel=channel, app_hash=app.config['APP_HASH'])
+
+    return verification.sid
+
+def check_verification(phone, code):
+    service = app.config['VERIFICATION_SID']
+
+    try:
+        verification_check = client.verify \
+            .services(service) \
+            .verification_checks \
+            .create(to=phone, code=code)
+
+        if verification_check.status == "approved":
+            return True
+
+        else:
+            return False
+
+    except Exception as e:
+        return False
+
+@app.route('/register_number', methods=['POST'])
+def register_number():
+    current_user.phone_number = request.json['number']
+    current_user.save()
+    return jsonify({'success': True})
+
+@app.route('/send_verification_code', methods=['POST'])
+def send_verifacation_code():
+    if start_verification(request.json['number']) is None:
+        return jsonify({'success' : False})
+    current_user.phone_number = request.json['number']
+    return jsonify({'success': True})
+
+@app.route('/check_verification_code', methods=['POST'])
+def check_verifacation_code():
+    if check_verification(current_user.phone_number, request.json['code']):
+        current_user.save()
+        return jsonify({'verify' : True})
+    else:
+        return jsonify({'verify' : False})
+
+@app.route('/has_phone_number', methods=['GET'])
+def has_phone_number():
+    if not current_user.is_authenticated:
+        return jsonify({'has_phone_number' : False})
+    if current_user.phone_number is None:
+        return jsonify({'has_phone_number' : False})
+    else:
+        return jsonify({'has_phone_number' : True})
+
+
 from imagekitio import ImageKit
 
 imagekit = ImageKit(
-    private_key='private_8F2220cD8fLXKYoEvMs3pKH5yWk=',
-    public_key='public_hZTJIDqZ+LIgQhi0er6ag1HWRrY=',
-    url_endpoint = 'https://ik.imagekit.io/djenda'
+    private_key=app.config['IMAGEKIT_PRIVATE_KEY'],
+    public_key=app.config['IMAGEKIT_PUBLIC_KEY'],
+    url_endpoint =app.config['IMAGEKIT_URL_ENDPOINT']
 )
 
 @app.route('/auth_endpoint', methods=['GET'])
@@ -199,28 +259,12 @@ def auth_endpoint():
 
     return jsonify(auth_params)
 
-@app.route('/login_test', methods=['GET'])
-def login_test():
-    user =  User.objects(unique_id=str(1)).first()
-    login_user(user)
-    return str(user.nom)
-
-@app.route('/logout_test', methods=['GET'])
-def logout_test():
-    logout_user()
-    return ""
-
-@app.route('/log_test', methods=['GET'])
-def log_test():
-    return str(current_user.is_authenticated)
 
 @app.route('/verify_oauth2_token/<token>', methods=['GET'])
 def verify_oauth2_token(token):
     try:
-        userinfo_response = id_token.verify_oauth2_token(token, requests.Request(), GOOGLE_CLIENT_ID)
-
+        userinfo_response = id_token.verify_oauth2_token(token, requests.Request(),app.config['GOOGLE_CLIENT_ID'])
         unique_id = userinfo_response["sub"]
-        print({"verify":current_user.is_authenticated})
         user = User.objects(unique_id=str(unique_id)).first()
         # Doesn't exist? Add it to the database.
         if not user:
@@ -229,11 +273,11 @@ def verify_oauth2_token(token):
                         email = userinfo_response["email"],
                         url_photo = userinfo_response["picture"])
             user.save()
-            print("------USER------")
+
         login_user(user)
-        return jsonify({"verify":current_user.is_authenticated})
+        return jsonify({"verify":True})
     except ValueError:
-        return jsonify({"verify":current_user.is_authenticated})
+        return jsonify({"verify":False})
 
 
 @app.route('/users', methods=['GET'])
@@ -241,8 +285,8 @@ def all_users():
     return User.objects().to_json()
 
 @app.route('/users/<id>', methods=['GET'])
-def get_user(numero):
-    user = User.objects(unique_id=id).first()
+def get_user(id):
+    user = User.objects(unique_id=str(id)).first()
     if user == None:
         abort(404)
     return user.to_json()
@@ -272,24 +316,24 @@ def add_produit(id):
     user = User.objects(unique_id=id).first()
     if user == None:
         abort(404)
-    produit = Produit.product_from_dict(request).save()
-    user.produits.append(produit)
-    user.save()
+    user.add_article_from_dict(request.json)
+    return user.articles_to_json()
+
+@app.route('/users/produits', methods=['GET'])
+def user_produit():
+    user = User.objects(unique_id=current_user.unique_id).first()
+    if not user:
+        abort(404)
     return user.articles_to_json()
 
 @app.route('/produits', methods=['POST'])
-def add_produit_only():
+def add_user_produit():
     is_product_or_404(request)
-    user = None
-    if not User.objects(unique_id=1).first():
-        user = User(unique_id = 1,
-                    nom ="alchimiste",
-                    email = "djendambutwile@gmail.com",
-                    url_photo = "https://res.cloudinary.com/alchemist118/image/upload/w_100,h_100/v1595080373/mario.jpg")
-    produit = Produit.product_from_dict(request).save()
-    user.produits.append(produit)
-    user.save()
-    return produit.to_json()
+    user = User.objects(unique_id=current_user.unique_id).first()
+    if not user:
+        abort(404)
+    user.add_article_from_dict(request.json)
+    return user.articles_to_json()
 
 @app.route('/produits', methods=['GET'])
 def all_produits():

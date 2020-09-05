@@ -30,6 +30,10 @@ class FakeData:
          return random.choice(['iphone 6', 'samsung','hp', 'dell', 'polo', 'ps4'])
 
     @staticmethod
+    def phone_number():
+         return random.choice(['+243997028901'])
+
+    @staticmethod
     def prix():
          return random.choice([20, 30, 40,50,70,150, 200])
 
@@ -48,6 +52,7 @@ class FakeData:
         return User(unique_id=str(id),
                     nom = FakeData.nom_user(),
                     email = FakeData.email(),
+                    phone_number = FakeData.phone_number(),
                     url_photo = FakeData.url_photo())
 
     @staticmethod
@@ -59,6 +64,7 @@ class FakeData:
     def article():
         return Produit(nom=FakeData.nom_article(),
                        prix=FakeData.prix(),
+                       vendeur_id="",
                        categorie=FakeData.categorie(),
                        description=FakeData.description(),
                        url_photo=FakeData.url_photo(),
@@ -107,11 +113,10 @@ class FakeData:
     def gerate_and_insert_user_with_articles():
         print('User ')
         user = FakeData.user(id=1)
-        print('nom: ', user.nom, ' id: ', user.unique_id)
+        print('nom: ', user.nom, ' number: ', user.phone_number)
         for article in FakeData.add_article_to_database(10):
-            user.produits.append(article)
-            print('nom: ', article.nom, ' categorie: ', article.categorie)
-        user.save()
+            user.add_article(article)
+            print('nom: ', article.nom, ' vendeur_id: ', article.vendeur_id)
         print(User.objects(unique_id=str(1)))
 
 
