@@ -244,6 +244,10 @@ def has_phone_number():
     else:
         return jsonify({'has_phone_number' : True})
 
+@app.route('/posts_restants', methods=['GET'])
+def posts_restants():
+    return jsonify({'posts_restants' : current_user.nbr_articles_restant()})
+
 
 from imagekitio import ImageKit
 
@@ -268,11 +272,7 @@ def verify_oauth2_token(token):
         user = User.objects(unique_id=str(unique_id)).first()
         # Doesn't exist? Add it to the database.
         if not user:
-            user = User(unique_id = str(userinfo_response["sub"]),
-                        nom = userinfo_response["given_name"],
-                        email = userinfo_response["email"],
-                        url_photo = userinfo_response["picture"])
-            user.save()
+            user = User.from_user_info(userinfo_response)
 
         login_user(user)
         return jsonify({"verify":True})
@@ -301,7 +301,6 @@ def get_user_produits(id):
 def is_product_or_404(request):
     if (not request.json or
         not request.json['prix'] or
-        not request.json['nom'] or
         not request.json['categorie'] or
         not request.json['description'] or
         not request.json['url_photo'] or
@@ -355,7 +354,6 @@ def update_produit(id):
     if produit == None:
         abort(404)
 
-    produit.nom = request.json['nom']
     produit.prix = request.json['prix'],
     produit.categorie = request.json['categorie'],
     produit.description = request.json['description']

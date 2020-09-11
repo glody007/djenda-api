@@ -57,17 +57,20 @@ class FakeData:
 
     @staticmethod
     def location():
-        return [10.5, -10.4]
+        return random.choice([[10.5, -10.4], [2.4, 5], [4, 20], [20, 30]])
 
 
     @staticmethod
     def article():
+        data_time = datetime.datetime.utcnow()
         return Produit(nom=FakeData.nom_article(),
                        prix=FakeData.prix(),
                        vendeur_id="",
                        categorie=FakeData.categorie(),
                        description=FakeData.description(),
                        url_photo=FakeData.url_photo(),
+                       timestamp=data_time,
+                       created_at=str(data_time),
                        url_thumbnail_photo=FakeData.url_thumbnail_photo(),
                        location=FakeData.location())
 
@@ -98,6 +101,7 @@ class FakeData:
     def add_article_to_database(nbr=1):
         articles = FakeData.articles(nbr)
         for article in articles:
+            print(article.to_json())
             article.save()
         return articles
 
@@ -105,7 +109,7 @@ class FakeData:
     def gerate_and_insert_articles():
         print('Articles ')
         for article in FakeData.articles():
-            print('nom: ', article.nom, ' categorie: ', article.categorie)
+            print(' created_at: ', article.created_at)
 
         FakeData.add_article_to_database(20)
 
@@ -114,12 +118,13 @@ class FakeData:
         print('User ')
         user = FakeData.user(id=1)
         print('nom: ', user.nom, ' number: ', user.phone_number)
-        for article in FakeData.add_article_to_database(10):
+        for article in FakeData.add_article_to_database(20):
             user.add_article(article)
-            print('nom: ', article.nom, ' vendeur_id: ', article.vendeur_id)
+            print('created_at: ', article.created_at)
         print(User.objects(unique_id=str(1)))
 
 
 if __name__ == '__main__':
     db.drop_database('djenda-test-database')
     print(FakeData.gerate_and_insert_user_with_articles())
+    print(Produit.best_match(nbr=5).only("location", "created_at").to_json())
