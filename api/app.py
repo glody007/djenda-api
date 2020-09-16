@@ -244,10 +244,6 @@ def has_phone_number():
     else:
         return jsonify({'has_phone_number' : True})
 
-@app.route('/posts_restants', methods=['GET'])
-def posts_restants():
-    return jsonify({'posts_restants' : current_user.nbr_articles_restant()})
-
 
 from imagekitio import ImageKit
 
@@ -283,6 +279,10 @@ def verify_oauth2_token(token):
 @app.route('/users', methods=['GET'])
 def all_users():
     return User.objects().to_json()
+
+@app.route('/users/posts_restants', methods=['GET'])
+def posts_restants():
+    return jsonify({'posts_restants' : current_user.nbr_articles_restant()})
 
 @app.route('/users/<id>', methods=['GET'])
 def get_user(id):

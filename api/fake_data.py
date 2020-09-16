@@ -49,11 +49,11 @@ class FakeData:
     def user(id=None):
         if id == None:
             id = FakeData.id()
-        return User(unique_id=str(id),
-                    nom = FakeData.nom_user(),
-                    email = FakeData.email(),
-                    phone_number = FakeData.phone_number(),
-                    url_photo = FakeData.url_photo())
+        return User.insert(User(unique_id=str(id),
+                            nom = FakeData.nom_user(),
+                            email = FakeData.email(),
+                            phone_number = FakeData.phone_number(),
+                            url_photo = FakeData.url_photo()), PlanType.GOLD)
 
     @staticmethod
     def location():
@@ -63,8 +63,7 @@ class FakeData:
     @staticmethod
     def article():
         data_time = datetime.datetime.utcnow()
-        return Produit(nom=FakeData.nom_article(),
-                       prix=FakeData.prix(),
+        return Produit(prix=FakeData.prix(),
                        vendeur_id="",
                        categorie=FakeData.categorie(),
                        description=FakeData.description(),

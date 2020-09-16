@@ -40,6 +40,16 @@ class TestUser(unittest.TestCase):
         with self.assertRaises(ValueError):
             user.add_article(article)
 
+        user = User(unique_id = str(info["sub"]),
+                    email=info["email"],
+                    nom=info["given_name"],
+                    url_photo=info["picture"])
+        user.save()
+        self.assertEqual(user.plan, None)
+
+        user.add_article(article)
+        self.assertNotEqual(user.plan, None)
+
 
 class TestPlan(unittest.TestCase):
 

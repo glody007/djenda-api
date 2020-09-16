@@ -134,6 +134,13 @@ class User(Document, UserMixin):
     produits = ListField(ReferenceField(Produit))
     plan = ReferenceField(Plan)
 
+    @staticmethod
+    def insert(user, plan_type):
+        user.save()
+        user.set_plan(Plan.create(plan_type=plan_type))
+        return user
+
+    @staticmethod
     def from_user_info(user_info):
         user =  User(unique_id = str(user_info["sub"]),
                      nom = user_info["given_name"],
@@ -169,7 +176,9 @@ class User(Document, UserMixin):
         return article
 
     def refresh_plan_if_end(self):
-        if self.plan.is_ended():
+        if self.plan == None:
+            self.set_plan(Plan.create())
+        elif self.plan.is_ended():
             self.set_plan(Plan.create())
 
     def articles_to_json(self):
