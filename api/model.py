@@ -154,6 +154,7 @@ class User(Document, UserMixin):
         return self.plan.can_post_article()
 
     def nbr_articles_restant(self):
+        self.refresh_plan_if_end()
         return self.plan.nbr_articles_restant
 
     def set_plan(self, plan):
